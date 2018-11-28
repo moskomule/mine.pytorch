@@ -1,5 +1,7 @@
 import numpy as np
-from torch import nn, Tensor, cat
+import torch
+
+from torch import nn, Tensor
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn import functional as F
 
@@ -15,7 +17,7 @@ class StaticNet(nn.Module):
     def forward(self, x: Tensor, z: Tensor) -> Tensor:
         x = F.leaky_relu(self.linear1(x))
         z = F.leaky_relu(self.linear2(z))
-        x = F.leaky_relu(self.linear3(cat([x, z], dim=1)))
+        x = F.leaky_relu(self.linear3(torch.cat([x, z], dim=1)))
         return self.linear4(x)
 
 
@@ -41,14 +43,18 @@ if __name__ == "__main__":
     p.add_argument("--hidden", type=int, default=16)
     args = p.parse_args()
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     loader = gaussian_data_loader(
         args.dim, args.num_samples, args.rho, args.batch_size)
-    static_net = StaticNet(args.dim, args.hidden)
+    static_net = StaticNet(args.dim, args.hidden).to(device)
     m = MINE(static_net, lr=args.lr, momentum=0.9)
     for ep in range(200):
         mi = 0
         counter = 0
         for x, z in loader:
+            x = x.to(device)
+            z = z.to(device)
             mi += m(x, z).item()
             counter += 1
 
