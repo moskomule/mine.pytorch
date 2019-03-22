@@ -1,6 +1,7 @@
 import math
 
 import torch
+from homura.optim import SGD, Optimizer
 from torch import nn
 from torch.nn import functional as F
 
@@ -86,10 +87,24 @@ class ConvStaticNet(nn.Module):
         return self.linear(F.adaptive_avg_pool2d(x, 1))
 
 
-class MINE(nn.Module):
-    def __init__(self, static_net):
-        super(MINE, self).__init__()
+class MINE(object):
+    """
+    >>> mine = MINE(fc_static_net(10, 10,))
+    >>> mine.to("cuda")
+    >>> mine(torch.randn(4, 10), torch.randn(4, 10))
+    >>> mine.eval()
+    """
+
+    def __init__(self,
+                 static_net: nn.Module,
+                 optimizer: Optimizer = None):
         self.static_net = static_net
+        _optimizer = optimizer
+        if optimizer is None:
+            _optimizer = SGD(lr=0.01, momentum=0.9)
+        self._optimizer = _optimizer
+        self.optimizer = optimizer.set_model(self.static_net)
+        self.training = True
 
     def forward(self,
                 input: torch.Tensor,
@@ -101,3 +116,25 @@ class MINE(nn.Module):
         margin = self.static_net(input, target[torch.randperm(target.size(0))]).logsumexp(dim=-1) \
                  - math.log(target.size(0))
         return joint + margin
+
+    def __call__(self,
+                 input: torch.Tensor,
+                 target: torch.Tensor) -> torch.Tensor:
+        mi = self.forward(input, target)
+        if not self.training:
+            return mi
+        self.optimizer.zero_grad()
+        (-mi).backward()
+        self.optimizer.step()
+        return mi.detach()
+
+    def train(self):
+        self.training = True
+
+    def eval(self):
+        self.training = False
+
+    def to(self,
+           device: torch.device):
+        self.static_net.to(device)
+        self.optimizer = self._optimizer.set_model(self.static_net)
