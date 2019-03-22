@@ -29,8 +29,8 @@ def main():
             if torch.isnan(mi):
                 print(f">>> {rho:2>}/{ep}, ")
             final_results[rho].append(mi.item())
-
-        print(f"{rho:>5}={mi.item():.4f}")
+        avg = torch.tensor(final_results[rho])[args.epochs // 100:].mean()
+        print(f"{rho:>5}={avg.item():.4f}")
 
 
 if __name__ == '__main__':
