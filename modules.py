@@ -12,12 +12,13 @@ def pair(i):
 
 
 class BiasConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1):
-        """
-        >>> conv = BiasConv2d(32, 32, 3)
-        >>> conv(torch.randn(32, 32, 28, 28), bias)
-        """
+    # conv net which takes input and class conditional bias
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: int,
+                 num_classes: int,
+                 stride=1, padding=0, dilation=1, groups=1):
         super(BiasConv2d, self).__init__()
         self.kernel_size = pair(kernel_size)
         self.stride = pair(stride)
@@ -26,9 +27,12 @@ class BiasConv2d(nn.Module):
         self.weight = nn.Parameter(torch.empty(in_channels,
                                                out_channels // groups,
                                                *self.kernel_size))
+        self.bias = nn.Linear(num_classes, out_channels)
 
-    def forward(self, input, bias):
-        return F.conv2d(input, self.weight, bias, self.stride, self.padding,
+    def forward(self,
+                input: torch.Tensor,
+                bias: torch.Tensor):
+        return F.conv2d(input, self.weight, self.bias(bias), self.stride, self.padding,
                         self.dilation, self.groups)
 
 
@@ -37,7 +41,7 @@ class GaussianNoiseLayer(nn.Module):
         super(GaussianNoiseLayer, self).__init__()
         self.std = std
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor):
         return input + torch.empty_like(input).normal_(0, self.std)
 
 
@@ -64,12 +68,12 @@ def fc_static_net(x_dim: int,
 
 
 class ConvStaticNet(nn.Module):
-    def __init__(self, input_size=32):
+    def __init__(self, num_classes=10, input_size=32):
         super(ConvStaticNet, self).__init__()
-        self.conv1 = BiasConv2d(3, 16, 5, stride=2, padding=2)
-        self.conv2 = BiasConv2d(16, 32, 5, stride=2, padding=2)
-        self.conv3 = BiasConv2d(32, 64, 5, stride=2, padding=2)
-        self.conv4 = BiasConv2d(64, 128, 5, stride=2, padding=2)
+        self.conv1 = BiasConv2d(3, 16, 5, num_classes, stride=2, padding=2)
+        self.conv2 = BiasConv2d(16, 32, 5, num_classes, stride=2, padding=2)
+        self.conv3 = BiasConv2d(32, 64, 5, num_classes, stride=2, padding=2)
+        self.conv4 = BiasConv2d(64, 128, 5, num_classes, stride=2, padding=2)
         self.linear = nn.Linear(input_size // 16, 1)
 
     def forward(self,
