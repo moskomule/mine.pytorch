@@ -2,7 +2,7 @@ import torch
 from homura.optim import Adam
 from torch.distributions import MultivariateNormal
 
-from modules import MINE, FCStaticNet
+from modules import KLMINE, FCStaticNet
 
 
 def normalize(t: torch.Tensor):
@@ -19,7 +19,7 @@ def main():
     for rho in args.rho:
         rho = rho / 10
         final_results[rho] = []
-        mine = MINE(FCStaticNet(2, 2), Adam())
+        mine = KLMINE(FCStaticNet(2, 2), Adam())
         mine.to(device)
         gaussian = MultivariateNormal(torch.zeros(2, device=device), torch.eye(2, device=device))
         for ep in range(args.epochs):

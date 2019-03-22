@@ -2,7 +2,7 @@ import torch
 from homura.optim import Adam
 from torch.distributions import MultivariateNormal
 
-from modules import MINE, FCStaticNet
+from modules import KLMINE, FCStaticNet
 
 
 def main():
@@ -12,7 +12,7 @@ def main():
     for rho in args.rho:
         rho = rho / 10
         final_results[rho] = []
-        mine = MINE(FCStaticNet(1, 1), Adam())
+        mine = KLMINE(FCStaticNet(1, 1), Adam())
         mine.to(device)
         gaussian = MultivariateNormal(torch.zeros(2),
                                       covariance_matrix=torch.tensor([[1, rho], [rho, 1]]))

@@ -121,11 +121,7 @@ class MINE(object):
                 target: torch.Tensor) -> torch.Tensor:
         # returns lower bound of MI
         # when update, update the negative of the returned value
-        joint = self.static_net(input, target).mean(dim=0)
-        # -log(size) for averaging
-        margin = self.static_net(input, target[torch.randperm(target.size(0))]).logsumexp(dim=0) \
-                 - math.log(target.size(0))
-        return joint - margin
+        raise NotImplementedError
 
     def __call__(self,
                  input: torch.Tensor,
@@ -149,3 +145,27 @@ class MINE(object):
         self.static_net.to(device)
         self.optimizer = self._optimizer.set_model(self.static_net.parameters())
         return self
+
+
+class KLMINE(MINE):
+    def forward(self,
+                input: torch.Tensor,
+                target: torch.Tensor):
+        batch_size = input.size(0) // 2
+        joint = self.static_net(input[:batch_size], target[:batch_size]).mean(dim=0)
+        # -log(size) for averaging
+        margin = self.static_net(input[batch_size:], target[batch_size:][torch.randperm(batch_size)]).logsumexp(dim=0) \
+                 - math.log(target.size(0))
+        return joint - margin
+
+
+class JSMINE(MINE):
+    def forward(self,
+                input: torch.Tensor,
+                target: torch.Tensor):
+        batch_size = input.size(0) // 2
+        joint = -F.softplus(-self.static_net(input[:batch_size],
+                                             target[:batch_size])).mean(dim=0)
+        margin = F.softplus(self.static_net(input[batch_size:],
+                                            target[batch_size:][torch.randperm(batch_size)])).mean(dim=0)
+        return joint - margin
