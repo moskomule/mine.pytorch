@@ -29,6 +29,7 @@ class BiasConv2d(nn.Module):
                                                out_channels // groups,
                                                *self.kernel_size))
         self.bias = nn.Linear(num_classes, out_channels)
+        nn.init.kaiming_normal_(self.weight)
 
     def forward(self,
                 input: torch.Tensor,
@@ -56,16 +57,25 @@ class ConcatLayer(nn.Module):
         return torch.cat(input, dim=self.cat_dim)
 
 
-def fc_static_net(x_dim: int,
-                  z_dim: int,
-                  hidden_dim: int = 512):
-    return nn.Sequential(ConcatLayer(),
-                         GaussianNoiseLayer(0.3),
-                         nn.Linear(x_dim + z_dim, hidden_dim),
-                         nn.ELU(),
-                         nn.Linear(hidden_dim, hidden_dim),
-                         nn.ELU(),
-                         nn.Linear(hidden_dim, 1))
+class FCStaticNet(nn.Module):
+    def __init__(self,
+                 x_dim: int,
+                 z_dim: int,
+                 hidden_dim: int = 512):
+        super(FCStaticNet, self).__init__()
+        self.dim = x_dim + z_dim
+        self.hidden_dim = hidden_dim
+        self.network = nn.Sequential(
+            GaussianNoiseLayer(0.3),
+            nn.Linear(x_dim + z_dim, hidden_dim),
+            nn.ELU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ELU(),
+            nn.Linear(hidden_dim, 1))
+
+    def forward(self, input, target):
+        x = torch.cat([input, target], dim=-1)
+        return self.network(x)
 
 
 class ConvStaticNet(nn.Module):
@@ -100,10 +110,10 @@ class MINE(object):
                  optimizer: Optimizer = None):
         self.static_net = static_net
         _optimizer = optimizer
-        if optimizer is None:
+        if _optimizer is None:
             _optimizer = SGD(lr=0.01, momentum=0.9)
         self._optimizer = _optimizer
-        self.optimizer = optimizer.set_model(self.static_net)
+        self.optimizer = None
         self.training = True
 
     def forward(self,
@@ -111,11 +121,11 @@ class MINE(object):
                 target: torch.Tensor) -> torch.Tensor:
         # returns lower bound of MI
         # when update, update the negative of the returned value
-        joint = self.static_net(input, target).mean(dim=-1)
+        joint = self.static_net(input, target).mean(dim=0)
         # -log(size) for averaging
-        margin = self.static_net(input, target[torch.randperm(target.size(0))]).logsumexp(dim=-1) \
+        margin = self.static_net(input, target[torch.randperm(target.size(0))]).logsumexp(dim=0) \
                  - math.log(target.size(0))
-        return joint + margin
+        return joint - margin
 
     def __call__(self,
                  input: torch.Tensor,
@@ -137,4 +147,5 @@ class MINE(object):
     def to(self,
            device: torch.device):
         self.static_net.to(device)
-        self.optimizer = self._optimizer.set_model(self.static_net)
+        self.optimizer = self._optimizer.set_model(self.static_net.parameters())
+        return self
