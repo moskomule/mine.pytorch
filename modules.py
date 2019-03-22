@@ -155,7 +155,7 @@ class KLMINE(MINE):
         joint = self.static_net(input[:batch_size], target[:batch_size]).mean(dim=0)
         # -log(size) for averaging
         margin = self.static_net(input[batch_size:], target[batch_size:][torch.randperm(batch_size)]).logsumexp(dim=0) \
-                 - math.log(target.size(0))
+                 - math.log(batch_size)
         return joint - margin
 
 
