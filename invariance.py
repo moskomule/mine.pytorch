@@ -24,7 +24,7 @@ def main():
         gaussian = MultivariateNormal(torch.zeros(2, device=device), torch.eye(2, device=device))
         for ep in range(args.epochs):
             input = (torch.rand(args.batch_size, 2) * 2 - 1).to(device)
-            target = function(input) + rho * gaussian.sample(torch.Size([512]))
+            target = function(input) + rho * gaussian.sample(torch.Size([args.batch_size]))
             mi = mine(normalize(input), normalize(target))
             if torch.isnan(mi):
                 print(f">>> {rho:2>}/{ep}, ")
